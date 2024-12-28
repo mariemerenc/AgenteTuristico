@@ -1,3 +1,4 @@
 .env
 .venv
 chroma
+__pycache__
