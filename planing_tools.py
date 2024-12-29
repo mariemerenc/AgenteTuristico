@@ -84,7 +84,7 @@ def weatherapi_forecast_periods(date_string: str) -> str:
                 if filtered_data:
                     for hour in filtered_data:
                         result += (
-                            f"  Hora: {hour['hora']} - "
+                            f"Hora: {hour['hora']} - "
                             f"Temp: {hour['temperatura']}°C, "
                             f"Condição: {hour['condicao']}, "
                             f"Chance de chuva: {hour['chance_de_chuva']}%, "
@@ -101,7 +101,7 @@ def weatherapi_forecast_periods(date_string: str) -> str:
     except Exception as e:
         return f"Erro inesperado: {str(e)}"
 
-def query_rag(query_text):
+def query_rag(query_text: str) -> str:
     embedding_function = get_embedding_function()
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
 
@@ -110,6 +110,3 @@ def query_rag(query_text):
 
     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
     return context_text
-
-def query_rag_tool(query_text: str) -> str:
-    return query_rag(query_text)
