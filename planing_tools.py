@@ -12,28 +12,6 @@ CHROMA_PATH = "chroma"
 WEATHER_API = os.getenv('WEATHER_API')
 BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
 
-def get_date_for_day(day_name):
-    """
-    Função para construir a data para um dia da semana específico.
-    """
-    today = datetime.today()
-    today_weekday = today.weekday()
-
-    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    try:
-        requested_weekday = days_of_week.index(day_name)
-    except ValueError:
-        return None
-
-    if requested_weekday == today_weekday:
-       return today.strftime("%Y-%m-%d")
-    
-    days_until_requested = (requested_weekday - today_weekday + 7) % 7
-    target_date = today + timedelta(days=days_until_requested)
-    print(target_date)
-    return target_date.strftime("%Y-%m-%d")
-
-
 def weatherapi_forecast_periods(date_string: str) -> str:
     """
     Obtém a previsão do tempo para a cidade de Natal em uma data específica,
