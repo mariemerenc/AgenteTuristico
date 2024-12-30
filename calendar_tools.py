@@ -1,4 +1,5 @@
 import json
+import ast
 from google_apis import create_service
 
 client_secret = 'client_secret.json'
@@ -118,12 +119,15 @@ def list_calendar_events(calendar_id, max_capacity=20):
 
 def insert_calendar_event(event_details):
     """
-    Insere ou manipula eventos em um calendário Google.
+    Insere um ou mais eventos em um calendário Google.
 
     Parâmetros:
-    - event_details (str ou dict): Uma string JSON ou um dicionário Python contendo os detalhes do evento, incluindo 'calendar_id'.
+    - event_details (str ou list de dict ou dict): Uma string contendo JSON,
+      um dicionário Python representando um único evento, ou uma lista de
+      dicionários Python, cada um representando um evento. Os detalhes do evento
+      devem incluir 'calendar_id'.
 
-    Formato esperado:
+    Formato esperado (para um único evento):
     {
         "calendar_id": "ID do calendário",
         "summary": "Resumo do evento",
@@ -134,41 +138,108 @@ def insert_calendar_event(event_details):
         "attendees": [{"email": "exemplo@dominio.com"}]
     }
 
+    Formato esperado (para uma lista de eventos):
+    [
+        {
+            "calendar_id": "ID do calendário",
+            "summary": "Resumo do evento 1",
+            ...
+        },
+        {
+            "calendar_id": "ID do calendário",
+            "summary": "Resumo do evento 2",
+            ...
+        }
+    ]
+
     Retorna:
-    - dict: Detalhes do evento criado ou mensagem de erro.
+    - list ou dict: Se múltiplos eventos, retorna uma lista de resultados (dicts).
+      Se um único evento, retorna um dicionário com os detalhes do evento criado
+      ou uma mensagem de erro.
     """
     try:
         if isinstance(event_details, str):
-            event_details = json.loads(event_details)
+            # Tenta decodificar como JSON diretamente (para listas ou dicionários)
+            try:
+                parsed_details = json.loads(event_details)
+            except json.JSONDecodeError:
+                # Se falhar, tenta avaliar como um literal Python
+                try:
+                    parsed_details = ast.literal_eval(event_details)
+                except (SyntaxError, ValueError) as e:
+                    return f"Erro ao decodificar a string de detalhes do evento: {e}"
+            event_details = parsed_details
 
-        calendar_id = event_details.pop('calendar_id', None)
-        if not calendar_id:
-            return "Erro: 'calendar_id' não encontrado nos detalhes do evento."
+        if isinstance(event_details, list):
+            results = []
+            for single_event_details in event_details:
+                try:
+                    # Certifica que cada item da lista é um dicionário
+                    if not isinstance(single_event_details, dict):
+                        results.append(f"Erro: Item na lista de eventos não é um dicionário: {single_event_details}")
+                        continue
 
-        for key in ['start', 'end']:
-            if key in event_details:
-                if 'dateTime' not in event_details[key]:
-                    if 'date' in event_details[key]:
-                        default_time = "T00:00:00" if key == 'start' else "T23:59:59"
-                        event_details[key] = {
-                            'dateTime': f"{event_details[key]['date']}{default_time}",
-                            'timeZone': 'America/Fortaleza'
-                        }
-                    else:
-                        return f"Erro: '{key}' deve conter 'dateTime' ou 'date'."
-            else:
-                return f"Erro: '{key}' faltando nos detalhes do evento."
+                    calendar_id = single_event_details.pop('calendar_id', None)
+                    if not calendar_id:
+                        results.append("Erro: 'calendar_id' não encontrado nos detalhes do evento.")
+                        continue
 
-        event = {k: v for k, v in event_details.items() if v is not None}
+                    for key in ['start', 'end']:
+                        if key in single_event_details:
+                            if 'dateTime' not in single_event_details[key]:
+                                if 'date' in single_event_details[key]:
+                                    default_time = "T00:00:00" if key == 'start' else "T23:59:59"
+                                    single_event_details[key] = {
+                                        'dateTime': f"{single_event_details[key]['date']}{default_time}",
+                                        'timeZone': 'America/Fortaleza'
+                                    }
+                                else:
+                                    results.append(f"Erro: '{key}' deve conter 'dateTime' ou 'date'.")
+                                    break
+                        else:
+                            results.append(f"Erro: '{key}' faltando nos detalhes do evento.")
+                            break
+                    else:  # Executado se o loop interno não for interrompido
+                        event = {k: v for k, v in single_event_details.items() if v is not None}
+                        # Supondo que 'calendar_service' está definido em algum lugar
+                        created_event = calendar_service.events().insert(calendarId=calendar_id, body=event).execute()
+                        results.append(created_event)
+                except Exception as e:
+                    results.append(f"Ocorreu um erro ao processar um evento: {e}")
+            return results
 
-        created_event = calendar_service.events().insert(calendarId=calendar_id, body=event).execute()
-        return created_event
+        elif isinstance(event_details, dict):
+            calendar_id = event_details.pop('calendar_id', None)
+            if not calendar_id:
+                return "Erro: 'calendar_id' não encontrado nos detalhes do evento."
+
+            for key in ['start', 'end']:
+                if key in event_details:
+                    if 'dateTime' not in event_details[key]:
+                        if 'date' in event_details[key]:
+                            default_time = "T00:00:00" if key == 'start' else "T23:59:59"
+                            event_details[key] = {
+                                'dateTime': f"{event_details[key]['date']}{default_time}",
+                                'timeZone': 'America/Fortaleza'
+                            }
+                        else:
+                            return f"Erro: '{key}' deve conter 'dateTime' ou 'date'."
+                else:
+                    return f"Erro: '{key}' faltando nos detalhes do evento."
+
+            event = {k: v for k, v in event_details.items() if v is not None}
+
+            # Supondo que 'calendar_service' está definido em algum lugar
+            created_event = calendar_service.events().insert(calendarId=calendar_id, body=event).execute()
+            return created_event
+        else:
+            return "Erro: Formato de detalhes do evento não reconhecido. Deve ser uma string JSON, um dicionário ou uma lista de dicionários."
 
     except json.JSONDecodeError as e:
         return f"Erro ao decodificar JSON: {e}"
     except TypeError as e:
         return f"Erro de tipo ao passar argumentos: {e}. Verifique a estrutura do JSON ou dicionário."
     except Exception as e:
-        return f"Ocorreu um erro: {e}"
+        return f"Ocorreu um erro geral: {e}"
 
 
