@@ -1,8 +1,25 @@
 import json
-import ast
+import time
+from pydantic import BaseModel, Field, ValidationError
+from typing import List
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import ChatPromptTemplate
 from google_apis import create_service
-
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI,
+    HarmBlockThreshold,
+    HarmCategory,
+)
 client_secret = 'client_secret.json'
+
+class Evento(BaseModel):
+    calendar_id: str = Field(default="primary", description="Identificador do calendário do Google Agenda onde o evento será criado. Por padrão, utiliza o calendário principal do usuário ('primary'). Para usar um calendário diferente, forneça o ID do calendário específico.")
+    summary: str = Field(description="Título ou resumo conciso do evento, que será exibido no Google Agenda.")
+    location: str = Field(description="Localização do evento. Pode ser um endereço físico ou um nome de local.")
+    description: str = Field(description="Descrição detalhada do evento, incluindo informações adicionais, agenda, objetivos.")
+    start: str = Field(description="Data e hora de início do evento no formato ISO 8601 (Exemplo: '2023-10-27T10:00:00').")
+    end: str = Field(description="Data e hora de término do evento no formato ISO 8601 (Exemplo: '2023-10-27T11:00:00').")
+    timezone: str = Field(default="America/Fortaleza", description="Fuso horário do evento, utilizando a nomenclatura da IANA Time Zone Database (e.g., 'America/Sao_Paulo', 'Europe/London'). O padrão é 'America/Fortaleza'.")
 
 def construct_google_calendar_client(client_secret):
     """
@@ -103,7 +120,7 @@ def list_calendar_events(calendar_id, max_capacity=20):
     capacity_tracker = 0
     while True:
         events_list = calendar_service.events().list(
-            calendarId=calendar_id,  # Corrigido para 'calendarId'
+            calendarId=calendar_id,
             maxResults=min(250, max_capacity - capacity_tracker),
             pageToken=next_page_token
         ).execute()
@@ -116,130 +133,104 @@ def list_calendar_events(calendar_id, max_capacity=20):
             break
     return all_events
 
-
-def insert_calendar_event(event_details):
+def extract_event_parameters(query):
     """
-    Insere um ou mais eventos em um calendário Google.
+    Extrai parâmetros de um evento a partir de uma descrição em linguagem natural.
 
-    Parâmetros:
-    - event_details (str ou list de dict ou dict): Uma string contendo JSON,
-      um dicionário Python representando um único evento, ou uma lista de
-      dicionários Python, cada um representando um evento. Os detalhes do evento
-      devem incluir 'calendar_id'.
+    Esta função utiliza um modelo de linguagem grande para interpretar a descrição do evento
+    fornecida e extrair informações como resumo, local, descrição, horário de início e fim,
+    e fuso horário. A resposta é formatada como um JSON de acordo com o esquema definido pela
+    classe `Evento`.
 
-    Formato esperado (para um único evento):
-    {
-        "calendar_id": "ID do calendário",
-        "summary": "Resumo do evento",
-        "location": "Localização",
-        "description": "Descrição do evento",
-        "start": {"date": "YYYY-MM-DD"} ou {"dateTime": "YYYY-MM-DDTHH:MM:SS", "timeZone": "America/Fortaleza"},
-        "end": {"date": "YYYY-MM-DD"} ou {"dateTime": "YYYY-MM-DDTHH:MM:SS", "timeZone": "America/Fortaleza"},
-        "attendees": [{"email": "exemplo@dominio.com"}]
+    Args:
+        query (str): A descrição do evento em linguagem natural.
+                      Exemplo: "Marcar reunião com o time de marketing amanhã às 10h na sala de conferência."
+
+    Returns:
+        str: Uma string JSON contendo os parâmetros extraídos do evento, ou None se a extração falhar.
+             O JSON terá a seguinte estrutura:
+             {
+                 "calendar_id": "ID do calendário Google (padrão: 'primary')",
+                 "summary": "Resumo do evento",
+                 "location": "Local do evento",
+                 "description": "Descrição do evento",
+                 "start": "Hora de início do evento",
+                 "end": "Hora de término do evento",
+                 "timezone": "Fuso horário do evento (padrão: 'America/Fortaleza')"
+             }
+    """
+    llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    convert_system_message_to_human=True,
+    handle_parsing_errors=True,
+    temperature=0.6,
+    max_tokens= 1000,
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    },
+)
+    parser = PydanticOutputParser(pydantic_object=Evento)
+
+    prompt = ChatPromptTemplate.from_messages([
+    ("system", "Você é um assistente especialista em extrair informações de eventos de textos. Extraia os parâmetros necessários para criar um evento, incluindo data e hora de início e fim. Retorne a resposta formatada em JSON de acordo com o esquema fornecido.\n\n{format_instructions}\n"),
+    ("human", "{user_query}")
+    ])
+    chain = prompt | llm | parser
+
+    resposta = chain.invoke({
+    "language": "Portuguese",
+    "user_query": query,
+    "format_instructions": parser.get_format_instructions(),
+    })
+    resposta_dict = {
+        'summary': resposta.summary,
+        'location': resposta.location,
+        'description': resposta.description,
+        'start': {
+                "dateTime": resposta.start,
+                "timeZone": resposta.timezone
+            },
+        'end': {
+                "dateTime": resposta.end,
+                "timeZone": resposta.timezone
+            },
+        'attendees': []
     }
 
-    Formato esperado (para uma lista de eventos):
-    [
-        {
-            "calendar_id": "ID do calendário",
-            "summary": "Resumo do evento 1",
-            ...
-        },
-        {
-            "calendar_id": "ID do calendário",
-            "summary": "Resumo do evento 2",
-            ...
-        }
-    ]
+    
+    resposta_json = json.dumps(resposta_dict, ensure_ascii=False)
+    return resposta.calendar_id, resposta_json
+def insert_calendar_event(event):
+    """
+    Insere um evento em um calendário Google.
+
+    Parâmetros:
+    - event (str): Uma descrição em linguagem natural do evento a ser criado.
+      A função `extract_event_parameters` será utilizada para extrair os detalhes
+      do evento a partir desta descrição e convertê-los em um objeto `Evento`.
+      Exemplos:
+        - "Agendar almoço com a Maria na sexta-feira ao meio-dia no restaurante X."
+        - "Criar um lembrete para pagar as contas no dia 10 às 9h da manhã."
+        - "Bloquear minha agenda para foco no projeto Y na próxima segunda das 14h às 17h."
 
     Retorna:
-    - list ou dict: Se múltiplos eventos, retorna uma lista de resultados (dicts).
-      Se um único evento, retorna um dicionário com os detalhes do evento criado
-      ou uma mensagem de erro.
+    - dict: Detalhes do evento criado no Google Agenda ou mensagem de erro.
+      Em caso de sucesso, o dicionário conterá informações sobre o evento criado,
+      incluindo o ID do evento. Em caso de erro, retornará uma mensagem descrevendo
+      o problema encontrado durante o processamento ou inserção do evento.
     """
-    try:
-        if isinstance(event_details, str):
-            # Tenta decodificar como JSON diretamente (para listas ou dicionários)
-            try:
-                parsed_details = json.loads(event_details)
-            except json.JSONDecodeError:
-                # Se falhar, tenta avaliar como um literal Python
-                try:
-                    parsed_details = ast.literal_eval(event_details)
-                except (SyntaxError, ValueError) as e:
-                    return f"Erro ao decodificar a string de detalhes do evento: {e}"
-            event_details = parsed_details
+    extracted_data = extract_event_parameters(event)
+    if not extracted_data:
+        return "Erro: Não foi possível extrair os detalhes do evento da descrição fornecida."
 
-        if isinstance(event_details, list):
-            results = []
-            for single_event_details in event_details:
-                try:
-                    # Certifica que cada item da lista é um dicionário
-                    if not isinstance(single_event_details, dict):
-                        results.append(f"Erro: Item na lista de eventos não é um dicionário: {single_event_details}")
-                        continue
-
-                    calendar_id = single_event_details.pop('calendar_id', None)
-                    if not calendar_id:
-                        results.append("Erro: 'calendar_id' não encontrado nos detalhes do evento.")
-                        continue
-
-                    for key in ['start', 'end']:
-                        if key in single_event_details:
-                            if 'dateTime' not in single_event_details[key]:
-                                if 'date' in single_event_details[key]:
-                                    default_time = "T00:00:00" if key == 'start' else "T23:59:59"
-                                    single_event_details[key] = {
-                                        'dateTime': f"{single_event_details[key]['date']}{default_time}",
-                                        'timeZone': 'America/Fortaleza'
-                                    }
-                                else:
-                                    results.append(f"Erro: '{key}' deve conter 'dateTime' ou 'date'.")
-                                    break
-                        else:
-                            results.append(f"Erro: '{key}' faltando nos detalhes do evento.")
-                            break
-                    else:  # Executado se o loop interno não for interrompido
-                        event = {k: v for k, v in single_event_details.items() if v is not None}
-                        # Supondo que 'calendar_service' está definido em algum lugar
-                        created_event = calendar_service.events().insert(calendarId=calendar_id, body=event).execute()
-                        results.append(created_event)
-                except Exception as e:
-                    results.append(f"Ocorreu um erro ao processar um evento: {e}")
-            return results
-
-        elif isinstance(event_details, dict):
-            calendar_id = event_details.pop('calendar_id', None)
-            if not calendar_id:
-                return "Erro: 'calendar_id' não encontrado nos detalhes do evento."
-
-            for key in ['start', 'end']:
-                if key in event_details:
-                    if 'dateTime' not in event_details[key]:
-                        if 'date' in event_details[key]:
-                            default_time = "T00:00:00" if key == 'start' else "T23:59:59"
-                            event_details[key] = {
-                                'dateTime': f"{event_details[key]['date']}{default_time}",
-                                'timeZone': 'America/Fortaleza'
-                            }
-                        else:
-                            return f"Erro: '{key}' deve conter 'dateTime' ou 'date'."
-                else:
-                    return f"Erro: '{key}' faltando nos detalhes do evento."
-
-            event = {k: v for k, v in event_details.items() if v is not None}
-
-            # Supondo que 'calendar_service' está definido em algum lugar
-            created_event = calendar_service.events().insert(calendarId=calendar_id, body=event).execute()
-            return created_event
-        else:
-            return "Erro: Formato de detalhes do evento não reconhecido. Deve ser uma string JSON, um dicionário ou uma lista de dicionários."
-
-    except json.JSONDecodeError as e:
-        return f"Erro ao decodificar JSON: {e}"
-    except TypeError as e:
-        return f"Erro de tipo ao passar argumentos: {e}. Verifique a estrutura do JSON ou dicionário."
-    except Exception as e:
-        return f"Ocorreu um erro geral: {e}"
-
-
+    calendar_id, event_details = extracted_data
+    request_body = json.loads(event_details)
+    time.sleep(5)
+    event = calendar_service.events().insert(
+        calendarId = calendar_id,
+        body = request_body
+    ).execute()
+    return event
