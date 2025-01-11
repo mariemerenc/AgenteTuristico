@@ -41,7 +41,7 @@ dia_da_semana_pt = dias_da_semana_pt.get(dia_da_semana_ingles, dia_da_semana_ing
 data_atual = f"{dia_da_semana_pt}, {data_formatada}"
 
 load_dotenv()
-os.environ["GOOGLE_API_KEY"] = os.getenv('GENERATIVE_LANGUAGE_API_KEY')
+os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY')
 os.environ["LANGCHAIN_API_KEY"] = os.getenv('LANGCHAIN_API_KEY')
 
 llm = ChatGoogleGenerativeAI(
@@ -63,8 +63,6 @@ def transfer_to_calendar_agent(input_str):
 def transfer_to_travel_agent(input_str):
     return travel_agent_executor.invoke({"input": input_str})
 
-ddg_search = DuckDuckGoSearchAPIWrapper()
-from planing_tools import weatherapi_forecast_periods, query_rag
 ddg_search = DuckDuckGoSearchAPIWrapper()
 
 travel_planing_tools = [
