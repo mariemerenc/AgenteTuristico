@@ -15,8 +15,7 @@ from langchain_google_genai import (
 
 from planing_tools import weatherapi_forecast_periods, query_rag
 from calendar_tools import list_calendar_list, list_calendar_events, insert_calendar_event, create_calendar
-
-
+from dotenv import load_dotenv
 
 hoje = datetime.today()
 
@@ -41,9 +40,6 @@ dia_da_semana_pt = dias_da_semana_pt.get(dia_da_semana_ingles, dia_da_semana_ing
 # Formata a data para utilizar no prompt
 data_atual = f"{dia_da_semana_pt}, {data_formatada}"
 
-
-from dotenv import load_dotenv
-
 load_dotenv()
 os.environ["GOOGLE_API_KEY"] = os.getenv('GENERATIVE_LANGUAGE_API_KEY')
 os.environ["LANGCHAIN_API_KEY"] = os.getenv('LANGCHAIN_API_KEY')
@@ -67,6 +63,8 @@ def transfer_to_calendar_agent(input_str):
 def transfer_to_travel_agent(input_str):
     return travel_agent_executor.invoke({"input": input_str})
 
+ddg_search = DuckDuckGoSearchAPIWrapper()
+from planing_tools import weatherapi_forecast_periods, query_rag
 ddg_search = DuckDuckGoSearchAPIWrapper()
 
 travel_planing_tools = [
@@ -93,7 +91,7 @@ travel_planing_tools = [
     Tool(
         name="Calendar Agent",
         func=transfer_to_calendar_agent,
-        description="Esse agente lida com tudo relacionado ao calendário."
+        description="Esse agente lida com tudo relacionado ao calendário. As mensagens enviadas a ele devem estar em Português."
     ),
 ]
 
@@ -129,36 +127,57 @@ google_calendar_tools = [
         """
     ),
     Tool(
-        name="Insert Calendar Event",
-        func=insert_calendar_event,
-        description="""
-        Use a função Insert Calendar Event para adicionar um evento a um calendário.
-        Você precisa fornecer um dicionário Python contendo os detalhes do evento.
-        Se o timezone não for mencionado utilize "America/Fortaleza"
-        Se o usuário informar o nome do calendário para inserir o evento chame a função list_calendar_list primeiro para adquirir a informação de calendar_id
-        O dicionário deve ter a seguinte estrutura:
-        {
-            "calendar_id": "primary",
-            "summary": "Jantar em restaurante regional em Ponta Negra",
-            "location": "Restaurante regional em Ponta Negra",
-            "description": "",
-            "start": {
-                "dateTime": "2024-01-01T19:00:00",
-                "timeZone": "America/Fortaleza"
-            },
-            "end": {
-                "dateTime": "2024-01-01T22:00:00",
-                "timeZone": "America/Fortaleza"
-            },
-            "attendees": []
-        }
-        Ao final você DEVE fornecer o link do evento criado ao usuário além das informações do evento criado.
-        """
-    ),
-    Tool(
-        name="Main Agent",
-        func=transfer_to_travel_agent,
-        description="Transfere ao agente de turismo para perguntas não relacionadas a calendário"
+    name="Insert Calendar Event",
+    func=insert_calendar_event,
+    description="""
+        Use a função Insert Calendar Event para adicionar **um único evento** a um calendário Google.
+        Esta função deve ser chamada **uma vez para cada evento** que precisa ser agendado.
+
+        A entrada para esta função deve ser uma descrição clara e completa de **um único evento**
+        em linguagem natural, contendo todas as informações necessárias para agendá-lo individualmente.
+
+        Se o usuário pediu para criar um novo calendário, você DEVE utilizar o calendar_id desse novo calendário para a inserção dos eventos. 
+        
+        **Formato de entrada esperado:**
+
+        **Descrição em Linguagem Natural (obrigatório):**
+        Forneça uma descrição textual detalhada para **um único evento**. Inclua o calendar_id (se fornecido pelo usuário), o que será feito,
+        quando (data e hora específicas), onde (local exato) e quaisquer detalhes adicionais relevantes
+        para esse evento em particular.
+
+        **Exemplos de descrições de eventos individuais:**
+        - "Agendar almoço com a Maria na sexta-feira ao meio-dia no restaurante X."
+        - "Criar um compromisso para pagar as contas no dia 10 de janeiro às 9h da manhã."
+        - "Bloquear minha agenda para foco no projeto Y na próxima segunda-feira, das 14h às 17h, na minha mesa."
+
+        **Como usar esta função corretamente:**
+
+        1. **Identifique cada evento individualmente:** Se a intenção é agendar múltiplos eventos,
+           trate cada um como uma chamada separada para esta função.
+        2. **Obtenha o ID do calendário (se necessário):** Se o usuário mencionar um nome de
+           calendário específico, use a função 'list_calendar_list' **primeiro** para obter
+           o 'calendar_id' correspondente.
+        3. **Chame esta função com a descrição de um único evento:** Forneça a descrição completa
+           em linguagem natural para o evento específico que você deseja agendar.
+
+        **Informações essenciais para cada descrição de evento:**
+        - **O que:** Uma descrição concisa do evento (ex: "Reunião de equipe", "Consulta médica").
+        - **Quando:** A data e hora de início e fim **precisas** do evento.
+        - **Onde:** O local **específico** do evento.
+        - **Fuso Horário (opcional):** Se aplicável, mencione o fuso horário se for diferente
+          de "America/Fortaleza".
+
+        **Exemplo de uso**
+
+        *Usuário: Agendar visita ao Aquário Natal sábado das 9h às 12h.*
+        *Agente:* (Chama 'Insert Calendar Event' com a Action Input: "Agendar visita ao Aquário Natal sábado das 9h às 12h.")
+
+        **Observação IMPORTANTE:** Esta função **NÃO** deve ser usada para criar múltiplos eventos
+        com uma única chamada. Cada chamada deve corresponder a **um único evento**.
+
+        Ao final da execução desta função, você DEVE fornecer ao usuário a confirmação do agendamento
+        desse evento específico, incluindo o título, data, hora e link do evento criado (se disponível).
+    """
     )
 ]
 
