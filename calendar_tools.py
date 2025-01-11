@@ -228,7 +228,7 @@ def insert_calendar_event(event):
 
     calendar_id, event_details = extracted_data
     request_body = json.loads(event_details)
-    time.sleep(5)
+    time.sleep(1) ## Evitar limites de requisições do plano gratuito
     event = calendar_service.events().insert(
         calendarId = calendar_id,
         body = request_body
