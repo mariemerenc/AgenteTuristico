@@ -40,6 +40,9 @@ for video_filename in os.listdir(video_folder):
         with open(txt_path, "w", encoding="utf-8") as f:
             f.write(result["text"])
         
+        # Excluir o arquivo de áudio temporário
+        os.remove(audio_path)
+        
         # Incrementar o contador para o próximo arquivo
         contador += 1
 
