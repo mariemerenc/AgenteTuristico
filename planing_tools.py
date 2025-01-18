@@ -10,7 +10,7 @@ load_dotenv()
 
 CHROMA_PATH = "chroma"
 WEATHER_API = os.getenv('WEATHER_API')
-BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
+BASE_URL = "http://api.weatherapi.com/v1/forecast.json" #comentario
 
 def weatherapi_forecast_periods(date_string: str) -> str:
     """
