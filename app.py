@@ -4,7 +4,7 @@ from unidecode import unidecode
 
 DESTINOS = {
     "Natal": "Natal",
-    "Caicó": "Caicó"
+    "Caicó": "Caicó",
     "Pipa": "Pipa"
 }
 
