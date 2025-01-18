@@ -8,7 +8,7 @@ from langchain_chroma import Chroma
 load_dotenv()
 
 
-CHROMA_PATH = "chroma"
+CHROMA_PATH = "chroma/chroma_natal"
 WEATHER_API = os.getenv('WEATHER_API')
 BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
 
