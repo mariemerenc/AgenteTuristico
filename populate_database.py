@@ -36,7 +36,7 @@ def process_city(city_name: str, city_path: str):
     Processa uma subpasta de cidade, criando ou atualizando o Chroma correspondente.
     """
     
-    chroma_city_path = os.path.join(CHROMA_ROOT_PATH, f"chroma_{city_name}")
+    chroma_city_path = os.path.join(CHROMA_ROOT_PATH, f"{city_name}")
 
     
     documents = load_documents(city_path)
