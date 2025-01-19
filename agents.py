@@ -12,6 +12,7 @@ from langchain_google_genai import (
     HarmBlockThreshold,
     HarmCategory,
 )
+import streamlit as st
 
 from planing_tools import weatherapi_forecast_periods, query_rag
 from calendar_tools import list_calendar_list, list_calendar_events, insert_calendar_event, create_calendar
@@ -75,14 +76,31 @@ travel_planing_tools = [
     ),
     Tool(
         name="Weather Forecast",
-        func=weatherapi_forecast_periods,
-        description="""Essa ferramenta DEVE ser usada *antes* de gerar o roteiro turístico, após o modelo coletar todas as informações necessárias do usuário, incluindo as datas exatas. 
-        O modelo deve consultar o clima separadamente para um dia de cada vez no período informado, garantindo que as atividades do roteiro sejam planejadas de acordo com as condições climáticas. 
-        A previsão do tempo é um passo obrigatório quando é um fator relevante para o planejamento."""
-        ),
+        func=lambda date_string: weatherapi_forecast_periods(date_string, st.session_state.selected_destino),
+        description="""Esta ferramenta DEVE ser usada obrigatoriamente *antes* de gerar o roteiro turístico, e somente após coletar todas as informações necessárias do usuário, incluindo o intervalo exato de datas. 
+        A consulta do clima deve ser feita separadamente para cada dia do período informado, garantindo que as atividades planejadas no roteiro sejam compatíveis com as condições climáticas previstas. 
+
+        **Quando usar:**
+        - O clima é um fator relevante para a definição de atividades no roteiro.
+        - O usuário especificou o intervalo de datas para o planejamento.
+
+        **Instruções:**
+        1. Certifique-se de coletar as datas exatas do período solicitado pelo usuário.
+        2. Consulte a previsão do tempo para cada dia separadamente no intervalo de datas fornecido.
+        3. Use o resultado da previsão para ajustar o planejamento das atividades de acordo com as condições climáticas.
+
+        **Exemplo de uso:**
+        - Entrada do usuário: "Planeje um roteiro entre os dias 1º de agosto e 4 de março."
+        - Ações do modelo:
+            Action input: 2025/08/01
+            Action input: 2025/08/02
+            Action input: 2025/08/03
+            Action input: 2025/08/04
+    """
+    ),
     Tool(
         name="Query RAG",
-        func=query_rag,
+        func=lambda query_text: query_rag(query_text, st.session_state.selected_destino),
         description="""Esta ferramenta deve ser usada quando o modelo souber a cidade de destino e os interesses do usuário, com o objetivo de fornecer informações sobre pontos turísticos e atrações que se alinham com esses interesses. 
         O modelo deve utilizar essa ferramenta para sugerir atividades e lugares específicos a visitar, baseados na cidade e nos interesses fornecidos."""
     ),
@@ -198,11 +216,17 @@ calendar_prompt = google_calendar_prompt.partial(
 )
 
 history = ChatMessageHistory()
-memory = ConversationBufferWindowMemory(k=20, chat_memory=history, memory_key="chat_history")
+memory = ConversationBufferWindowMemory(
+    k=20, 
+    chat_memory=history, 
+    memory_key="chat_history",
+    input_key="input",
+    other_memory_key=["destino"])
 
 travel_planing_agent = (
     {
         "input": lambda x: x["input"],
+        "destino": lambda x: x.get("destino"),
         "agent_scratchpad": lambda x: format_log_to_str(x["intermediate_steps"]),
         "chat_history": lambda x: x["chat_history"],
         "data_atual": lambda x: data_atual,
@@ -212,7 +236,7 @@ travel_planing_agent = (
     | ReActSingleInputOutputParser()
 )
 
-travel_agent_executor = AgentExecutor(agent=travel_planing_agent, tools=travel_planing_tools, verbose=True, memory=memory)
+travel_agent_executor = AgentExecutor(agent=travel_planing_agent, tools=travel_planing_tools, verbose=True, memory=memory, handle_parsing_errors=True)
 
 google_calendar_agent = (
     {

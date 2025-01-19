@@ -32,3 +32,60 @@ Este projeto utiliza diversas ferramentas de Processamento de Linguagem Natural 
     *   `WeatherAPI`: Para obter informações meteorológicas detalhadas de uma determinada data.
 *   **Bancos de Dados Vetoriais:**
     *   `Chroma`: Banco de dados vetorial para armazenamento de documentos e busca semântica.
+
+### Pré-requisitos
+
+Certifique-se de ter o Python 3.10 instalado em seu sistema. Você pode verificar a versão do Python instalada usando o seguinte comando:
+
+```bash
+python --version
+```
+
+### Passo a Passo
+
+1. **Criação de um Ambiente Virtual:**
+
+    Crie um ambiente virtual utilizando a versão 3.10 do Python:
+
+    ```bash
+    python -m venv venv
+    ```
+
+2. **Ativação do Ambiente Virtual:**
+
+    Ative o ambiente virtual criado:
+
+    - No Windows:
+      ```bash
+      .\venv\Scripts\activate
+      ```
+    - No macOS/Linux:
+      ```bash
+      source venv/bin/activate
+      ```
+
+3. **Instalação das Dependências:**
+
+    Com o ambiente virtual ativado, instale as dependências listadas no arquivo `requirements.txt`:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Execução do Script `video_transcriptor.py`:**
+
+    Execute o script `video_transcriptor.py` para transcrever vídeos:
+
+    ```bash
+    python video_transcriptor.py
+    ```
+
+5. **Execução do Script `populate_database.py`:**
+
+    Execute o script `populate_database.py` para popular o banco de dados:
+
+    ```bash
+    python populate_database.py
+    ```
+
+Pronto! Agora você está pronto para utilizar o sistema de planejamento de viagens.

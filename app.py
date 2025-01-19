@@ -1,9 +1,23 @@
 import streamlit as st
 from agents import travel_agent_executor
+from unidecode import unidecode
+
+DESTINOS = {
+    "Natal": "natal",
+    "Caicó": "caico",
+    "Pipa": "pipa"
+}
 
 if __name__ == '__main__':
 
     st.title('Agente Turístico')
+    st.sidebar.title('Escolha um destino')
+    
+    destino_selecionado = st.sidebar.selectbox('Destino', list(DESTINOS.keys()))
+    
+    if destino_selecionado:
+        st.write(f"Você selecionou {destino_selecionado}")
+        st.session_state.selected_destino = DESTINOS[destino_selecionado]
 
     if 'messages' not in st.session_state:
         st.session_state.messages = []
@@ -19,7 +33,11 @@ if __name__ == '__main__':
             st.markdown(prompt)
 
         with st.chat_message('ai', avatar='🤖'):
-            response = travel_agent_executor.invoke({"input": prompt})
+            # Passa o destino selecionado como contexto para o agente
+            response = travel_agent_executor.invoke({
+                "input": prompt,
+                "destino": unidecode(DESTINOS[destino_selecionado].lower())
+            })
             agent_response = response['output']
             st.markdown(agent_response)
 

@@ -10,11 +10,11 @@ load_dotenv()
 
 CHROMA_PATH = "chroma"
 WEATHER_API = os.getenv('WEATHER_API')
-BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
+BASE_URL = "http://api.weatherapi.com/v1/forecast.json" #comentario
 
-def weatherapi_forecast_periods(date_string: str) -> str:
+def weatherapi_forecast_periods(date_string: str, destino: str) -> str:
     """
-    Obtém a previsão do tempo para a cidade de Natal em uma data específica,
+    Obtém a previsão do tempo para a cidade da cidade destino em uma data específica,
     separada em manhã, tarde e noite.
 
     Args:
@@ -26,7 +26,7 @@ def weatherapi_forecast_periods(date_string: str) -> str:
     try:
         params = {
             "key": WEATHER_API,
-            "q": "Natal",
+            "q": destino.capitalize(),
             "dt": date_string,
             "aqi": "no",
             "alerts": "no",
@@ -46,7 +46,7 @@ def weatherapi_forecast_periods(date_string: str) -> str:
                 "Noite": range(18, 24)
             }
 
-            result = f"Previsão para {date_string} em Natal:\n"
+            result = f"Previsão para {date_string} em {destino.capitalize()}:\n"
             for period, hours in periods.items():
                 result += f"\n{period}:\n"
                 filtered_data = [
@@ -79,12 +79,13 @@ def weatherapi_forecast_periods(date_string: str) -> str:
     except Exception as e:
         return f"Erro inesperado: {str(e)}"
 
-def query_rag(query_text: str) -> str:
+def query_rag(query_text: str, destino: str) -> str:
     embedding_function = get_embedding_function()
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+    db = Chroma(persist_directory=f"{CHROMA_PATH}/{destino}", embedding_function=embedding_function)
 
+    
     # Search the DB.
-    results = db.similarity_search_with_score(query_text, k=5)
+    results = db.similarity_search_with_score(f"{destino}: {query_text}", k=5)
 
     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
     return context_text
