@@ -78,9 +78,9 @@ travel_planing_tools = [
         name="Weather Forecast",
         func=weatherapi_forecast_periods,
         description="""Essa ferramenta DEVE ser usada *antes* de gerar o roteiro turístico, após o modelo coletar todas as informações necessárias do usuário, incluindo as datas exatas. 
-    O modelo deve consultar o clima separadamente para cada dia do período informado, garantindo que as atividades do roteiro sejam planejadas de acordo com as condições climáticas. 
-    A previsão do tempo é um passo obrigatório quando é um fator relevante para o planejamento."""
-    ),
+        O modelo deve consultar o clima separadamente para um dia de cada vez no período informado, garantindo que as atividades do roteiro sejam planejadas de acordo com as condições climáticas. 
+        A previsão do tempo é um passo obrigatório quando é um fator relevante para o planejamento."""
+        ),
     Tool(
         name="Query RAG",
         func=lambda query_text: query_rag(query_text, st.session_state.selected_destino),
@@ -93,6 +93,7 @@ travel_planing_tools = [
         description="Esse agente lida com tudo relacionado ao calendário. As mensagens enviadas a ele devem estar em Português."
     ),
 ]
+from calendar_tools import list_calendar_list, list_calendar_events, insert_calendar_event, create_calendar
 
 google_calendar_tools = [
     Tool(
@@ -175,7 +176,9 @@ google_calendar_tools = [
         com uma única chamada. Cada chamada deve corresponder a **um único evento**.
 
         Ao final da execução desta função, você DEVE fornecer ao usuário a confirmação do agendamento
-        desse evento específico, incluindo o título, data, hora e link do evento criado (se disponível).
+        desse evento específico, incluindo o título, data, hora.
+
+        No final forneça o link para o calendário google: [https://www.google.com/calendar]
     """
     )
 ]
