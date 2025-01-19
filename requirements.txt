@@ -1,8 +1,8 @@
 langchain
 langchain-google-genai
-langchain_community
 langchain_chroma
-langchain_ollama
+langchain_community
+langchain_huggingface
 duckduckgo-search
 chromadb
 duckduckgo-search
