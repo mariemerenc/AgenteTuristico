@@ -4,7 +4,8 @@ from unidecode import unidecode
 
 DESTINOS = {
     "Natal": "Natal",
-    "Caicó": "Caicó"
+    "Caicó": "Caicó",
+    "Pipa": "Pipa"
 }
 
 if __name__ == '__main__':
