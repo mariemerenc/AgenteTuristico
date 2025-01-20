@@ -10,9 +10,6 @@ DESTINOS = {
 }
 
 if __name__ == '__main__':
-    
-    client = chromadb.Client()
-    collection = client.get_collection('agente-turistico')
 
     st.title('Agente Turístico')
     st.sidebar.title('Escolha um destino')
