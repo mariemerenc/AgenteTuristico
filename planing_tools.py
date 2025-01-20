@@ -80,7 +80,7 @@ def weatherapi_forecast_periods(date_string: str, destino: str) -> str:
 
 def query_rag(query_text: str, destino: str) -> str:
     embedding_function = get_embedding_function()
-    db = Chroma(persist_directory=f"{CHROMA_PATH}/{destino}", embedding_function=embedding_function)
+    db = Chroma(collection_name="agente-turistico", persist_directory=f"{CHROMA_PATH}/{destino}", embedding_function=embedding_function)
 
     
     results = db.similarity_search_with_score(f"{destino}: {query_text}", k=5)
