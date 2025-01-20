@@ -15,5 +15,5 @@ python-dotenv==1.0.1
 moviepy==1.0.3
 openai-whisper==20240930
 reportlab==4.2.5
-Unidecode==1.3.8
+Unidecode
 sqlite3 >= 3.35.0
