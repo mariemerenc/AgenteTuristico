@@ -3,8 +3,12 @@ import os
 import requests
 from get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
+import chromadb
 
 load_dotenv()
+
+client = chromadb.Client()
+collection = client.get_collection(name="agente-turistico")
 
 
 CHROMA_PATH = "chroma"
