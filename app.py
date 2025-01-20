@@ -1,6 +1,7 @@
 import streamlit as st
 from agents import travel_agent_executor
 from unidecode import unidecode
+import chromadb
 
 DESTINOS = {
     "Natal": "natal",
@@ -9,6 +10,9 @@ DESTINOS = {
 }
 
 if __name__ == '__main__':
+    
+    client = chromadb.Client()
+    collection = client.get_collection('agente-turistico')
 
     st.title('Agente Turístico')
     st.sidebar.title('Escolha um destino')
